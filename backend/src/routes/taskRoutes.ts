@@ -3,6 +3,8 @@ import { Router } from "express";
 import {
     createTask,
     getTasks,
+    carryForwardTasks,
+    checkCarryForward
 } from "../controllers/taskController";
 
 import {
@@ -16,6 +18,18 @@ import {
 } from "../controllers/taskController";
 
 const router = Router();
+
+router.get(
+    "/carry-forward",
+    authenticate,
+    checkCarryForward
+);
+
+router.post(
+    "/carry-forward",
+    authenticate,
+    carryForwardTasks
+);
 
 router.post(
     "/",

@@ -204,41 +204,163 @@ export const deleteTask = async (
 
   }
 };
-
 export const completeTask = async (
   req: AuthRequest,
   res: Response
 ) => {
   try {
-
     const { id } = req.params;
 
-    const task = await Task.findOneAndUpdate(
-      {
-        _id: id,
-        userId: req.userId,
-        completed: false,
-      },
-      {
-        completed: true,
-        completedAt: new Date(),
-      },
-      {
-        new: true,
-      }
-    );
+    const task = await Task.findOne({
+      _id: id,
+      userId: req.userId,
+    });
 
     if (!task) {
       return res.status(404).json({
         success: false,
-        message: "Task not found or already completed.",
+        message: "Task not found.",
       });
     }
 
-    return res.json({
+    // Toggle completion status
+    task.completed = !task.completed;
+
+    // Set completedAt only when completed
+    task.completedAt = task.completed
+      ? new Date()
+      : null;
+
+    await task.save();
+
+    return res.status(200).json({
       success: true,
-      message: "Task completed successfully.",
+      message: task.completed
+        ? "Task completed successfully."
+        : "Task restored successfully.",
       task,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+export const carryForwardTasks = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    // Fetch yesterday's pending tasks
+    const pendingTasks = await Task.find({
+      userId: req.userId,
+      plannedDate: {
+        $gte: yesterday,
+        $lt: today,
+      },
+      completed: false,
+    });
+
+    let carried = 0;
+    let skipped = 0;
+
+    for (const task of pendingTasks) {
+
+      // Avoid duplicate tasks for today
+      const alreadyExists = await Task.findOne({
+        userId: req.userId,
+        title: task.title,
+        plannedDate: {
+          $gte: today,
+          $lt: tomorrow,
+        },
+      });
+
+      if (alreadyExists) {
+        skipped++;
+        continue;
+      }
+
+      await Task.create({
+        userId: task.userId,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        plannedDate: today,
+        points: task.points,
+        completed: false,
+        completedAt: null,
+      });
+      task.carriedForward = true;
+
+      await task.save();
+      carried++;
+    }
+
+   return res.status(200).json({
+    success: true,
+    carriedTasks: carried,
+    skippedTasks: skipped,
+    message: `${carried} task(s) carried forward. ${skipped} already existed.`,
+});
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
+export const checkCarryForward = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const pendingTasks = await Task.find({
+      userId: req.userId,
+      plannedDate: {
+        $gte: yesterday,
+        $lt: today,
+      },
+      completed: false,
+carriedForward: false,
+    })
+      .select("_id title priority points")
+      .sort({ priority: 1 });
+
+    return res.status(200).json({
+      success: true,
+      available: pendingTasks.length > 0,
+      count: pendingTasks.length,
+      tasks: pendingTasks.map(task => ({
+        id: task._id,
+        title: task.title,
+        priority: task.priority,
+        points: task.points,
+      })),
     });
 
   } catch (error) {

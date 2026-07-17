@@ -15,6 +15,8 @@ export interface ITask extends Document {
 
   completed: boolean;
 
+  carriedForward: boolean;
+
   completedAt?: Date | null;
 
   createdAt: Date;
@@ -67,6 +69,10 @@ const taskSchema = new Schema<ITask>(
       type: Date,
       default: null,
     },
+    carriedForward: {
+      type: Boolean,
+      default: false,
+    }
   },
   {
     timestamps: true,
