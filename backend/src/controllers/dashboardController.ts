@@ -415,7 +415,6 @@ export const getStreakDashboard = async (
 ) => {
   try {
     const STREAK_THRESHOLD = 50;
-    const MAX_GRACE_DAYS = 3;
 
     const tasks = await Task.find({
       userId: req.userId,
@@ -431,7 +430,7 @@ export const getStreakDashboard = async (
       }
     >();
 
-    // Group tasks by day
+    // Group tasks by date
     for (const task of tasks) {
       const key = task.plannedDate.toISOString().split("T")[0];
 
@@ -451,49 +450,13 @@ export const getStreakDashboard = async (
       }
     }
 
-    const dates = [...dayMap.keys()].sort();
-
-    let currentStreak = 0;
-    let longestStreak = 0;
-
-    // ---------- Longest Streak ----------
-    let running = 0;
-    let grace = 0;
-
-    for (const date of dates) {
-      const day = dayMap.get(date)!;
-
-      if (day.plannedPoints === 0) {
-        grace++;
-
-        if (grace > MAX_GRACE_DAYS) {
-          running = 0;
-          grace = 0;
-        }
-
-        continue;
-      }
-
-      const percentage =
-        (day.earnedPoints / day.plannedPoints) * 100;
-
-      if (percentage >= STREAK_THRESHOLD) {
-        running++;
-        longestStreak = Math.max(longestStreak, running);
-      } else {
-        running = 0;
-        grace = 0;
-      }
-    }
-
     // ---------- Current Streak ----------
-    running = 0;
-    grace = 0;
+    let currentStreak = 0;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let i = 0; ; i++) {
+    for (let i = 0; i < 3650; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
@@ -501,38 +464,57 @@ export const getStreakDashboard = async (
 
       const day = dayMap.get(key);
 
-      // No tasks that day
+      // Missed day -> streak ends immediately
       if (!day) {
-        grace++;
-
-        if (grace > MAX_GRACE_DAYS) {
-          break;
-        }
-
-        continue;
-      }
-
-      if (day.plannedPoints === 0) {
-        grace++;
-
-        if (grace > MAX_GRACE_DAYS) {
-          break;
-        }
-
-        continue;
+        break;
       }
 
       const percentage =
         (day.earnedPoints / day.plannedPoints) * 100;
 
       if (percentage >= STREAK_THRESHOLD) {
-        running++;
+        currentStreak++;
       } else {
         break;
       }
     }
 
-    currentStreak = running;
+    // ---------- Longest Streak ----------
+    let longestStreak = 0;
+    let running = 0;
+
+    if (dayMap.size > 0) {
+      const dates = [...dayMap.keys()].sort();
+
+      const start = new Date(dates[0]);
+      const end = new Date(dates[dates.length - 1]);
+
+      for (
+        let date = new Date(start);
+        date <= end;
+        date.setDate(date.getDate() + 1)
+      ) {
+        const key = date.toISOString().split("T")[0];
+
+        const day = dayMap.get(key);
+
+        // Missing day breaks streak
+        if (!day) {
+          running = 0;
+          continue;
+        }
+
+        const percentage =
+          (day.earnedPoints / day.plannedPoints) * 100;
+
+        if (percentage >= STREAK_THRESHOLD) {
+          running++;
+          longestStreak = Math.max(longestStreak, running);
+        } else {
+          running = 0;
+        }
+      }
+    }
 
     return res.json({
       success: true,
@@ -540,18 +522,15 @@ export const getStreakDashboard = async (
         currentStreak,
         longestStreak,
         threshold: STREAK_THRESHOLD,
-        graceDays: MAX_GRACE_DAYS,
+        graceDays: 0,
       },
     });
-
   } catch (error) {
-
     console.error(error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };

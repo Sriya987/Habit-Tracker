@@ -21,7 +21,9 @@ import {
   getWeeklyDashboard,
   getMonthlyDashboard,
 } from "../api/dashboardApi";
-
+import { getStreakDashboard } from "../api/dashboardApi";
+import type { StreakData } from "../types/dashboard";
+import StreakCard from "../components/StreakCard";
 import CarryForwardBanner from "../components/CarryForwardBanner";
 import CreateTaskModal from "../components/CreateTaskModal";
 import TaskCard from "../components/TaskCard";
@@ -59,8 +61,9 @@ function Dashboard() {
 
   const [monthlyData, setMonthlyData] =
     useState<MonthlyData[]>([]);
-
-  const [weeklyLoading, setWeeklyLoading] =
+    const [streak, setStreak] = useState<StreakData | null>(null);
+    const [streakLoading, setStreakLoading] = useState(true);
+    const [weeklyLoading, setWeeklyLoading] =
     useState(true);
 
   const [monthlyLoading, setMonthlyLoading] =
@@ -143,7 +146,19 @@ function Dashboard() {
       setWeeklyLoading(false);
     }
   };
+  const fetchStreak = async () => {
+  try {
+    setStreakLoading(true);
 
+    const response = await getStreakDashboard();
+
+    setStreak(response.streak);
+  } catch (error) {
+    console.error("Failed to load streak:", error);
+  } finally {
+    setStreakLoading(false);
+  }
+};
   const fetchMonthlyData = async () => {
     try {
       setMonthlyLoading(true);
@@ -192,6 +207,7 @@ function Dashboard() {
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
         fetchCarryForwardTasks(),
+        fetchStreak(),
       ]);
     };
 
@@ -241,6 +257,7 @@ function Dashboard() {
         fetchDashboard(),
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
+        fetchStreak(),
       ]);
     } catch (error) {
       console.error(
@@ -274,6 +291,7 @@ function Dashboard() {
         fetchDashboard(),
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
+        fetchStreak(),
       ]);
     } catch (error) {
       console.error(
@@ -303,6 +321,7 @@ function Dashboard() {
         fetchDashboard(),
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
+        fetchStreak(),
       ]);
     } catch (error) {
       console.error(
@@ -343,6 +362,7 @@ function Dashboard() {
         fetchDashboard(),
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
+        fetchStreak(),
       ]);
     } catch (error) {
       console.error(
@@ -373,6 +393,7 @@ function Dashboard() {
         fetchDashboard(),
         fetchWeeklyDashboard(),
         fetchMonthlyData(),
+        fetchStreak(),
       ]);
 
       await fetchCarryForwardTasks();
@@ -566,7 +587,15 @@ function Dashboard() {
         />
       </section>
             {/* Weekly Performance */}
-
+      <section className="mt-8">
+        {streakLoading ? (
+          <div className="rounded-2xl border bg-white p-8 text-center text-gray-500">
+            Loading streak...
+          </div>
+        ) : (
+          streak && <StreakCard streak={streak} />
+        )}
+      </section>
       <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
